@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Dodge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d0e15;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 242, 254, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: #12131c;
+            display: block;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            opacity: 0; /* Hidden on start screen, shown during gameplay */
+            transition: opacity 0.3s ease;
+        }
+
+        #score { color: #00f2fe; }
+        #high-score { color: #ff007f; }
+
+        /* Menu Overlays (Start & Game Over) */
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(13, 14, 21, 0.85);
+            text-align: center;
+            z-index: 10;
+        }
+
+        .menu-screen h1 {
+            font-size: 56px;
+            font-weight: 800;
+            color: #00f2fe;
+            text-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
+            margin-bottom: 5px;
+            letter-spacing: 3px;
+        }
+
+        .menu-screen .subtitle {
+            font-size: 16px;
+            color: #656a8a;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: 2px solid #ff007f;
+            color: #ff007f;
+            padding: 12px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-radius: 4px;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .menu-btn:hover {
+            background-color: #ff007f;
+            color: #fff;
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.6);
+            transform: scale(1.05);
+        }
+
+        .controls-hint {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #a0a5c1;
+            line-height: 1.6;
+        }
+
+        .controls-hint span {
+            color: #00f2fe;
+            font-weight: bold;
+            background: rgba(0, 242, 254, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+        }
+
+        /* Specific Game Over overrides */
+        #game-over-screen {
+            display: none;
+            background-color: rgba(18, 19, 28, 0.9);
+        }
+        #game-over-screen h1 {
+            color: #ff007f;
+            text-shadow: 0 0 20px rgba(255, 0, 127, 0.6);
+        }
+
+        #game-over-screen p {
+            font-size: 18px;
+            color: #00f2fe;
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+            animation: blink 1.5s infinite;
+            margin-top: 20px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Start Screen Menu -->
+        <div id="start-screen" class="menu-screen">
+            <h1>NEON DODGE</h1>
+            <div class="subtitle">Collect Stars to blast squares away!</div>
+            <button class="menu-btn" id="start-btn">Start Game</button>
+            <div class="controls-hint">
+                Move with: <span>W</span> <span>A</span> <span>S</span> <span>D</span><br>
+                <span style="border:none; background:none; color:#656a8a; font-size:12px; margin-top:5px; display:inline-block;">(Or press ENTER to start)</span>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui-overlay">
+            <div class="scoreboard" id="scoreboard">
+                <div>Score: <span id="score">0</span></div>
+                <div>High Score: <span id="high-score">0</span></div>
+            </div>
+            
+            <!-- Game Over Screen Menu -->
+            <div id="game-over-screen" class="menu-screen">
+                <h1>GAME OVER</h1>
+                <button class="menu-btn" id="restart-btn">Play Again</button>
+                <p>or Press SPACEBAR</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
+        const scoreboard = document.getElementById('scoreboard');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // Game Configuration & State
+        let score = 0;
+        let highScore = localStorage.getItem('neonDodgeHighScore') || 0;
+        highScoreEl.innerText = highScore;
+        
+        let gameState = 'START'; // Can be 'START', 'PLAYING', or 'GAMEOVER'
+        let spawnInterval = 40; 
+        let frameCount = 0;
+
+        // Controls
+        const keys = { w: false, a: false, s: false, d: false };
+
+        // Player setup
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 12,
+            speed: 5,
+            color: '#00f2fe',
+            glow: '#00f2fe'
+        };
+
+        // Entities
+        let enemies = [];
+        let currentStar = null; 
+        let activePulses = []; // Manages active EMP wave rings
+
+        // ==========================================
+        // SYNTHWAVE AUDIO ENGINE (Web Audio API)
+        // ==========================================
+        let audioCtx = null;
+        let mainVolume = null;
+        let musicInterval = null;
+        let beatCounter = 0;
+
+        const bassNotes = [82.41, 98.00, 110.00, 73.42]; 
+        const leadNotes = [164.81, 196.00, 220.00, 246.94, 293.66, 329.63, 392.00, 440.00];
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            mainVolume = audioCtx.createGain();
+            mainVolume.gain.setValueAtTime(0.8, audioCtx.currentTime); 
+            mainVolume.connect(audioCtx.destination);
+        }
+
+        function playSynthTone(freq, type, duration, vol, detune = 0) {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            
+            let osc = audioCtx.createOscillator();
+            let gainNode = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.detune.setValueAtTime(detune, audioCtx.currentTime);
+            
+            if (type === 'sawtooth' && Math.random() > 0.5) {
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.5, audioCtx.currentTime + duration);
+            }
+
+            gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(mainVolume);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playDrum(type, vol) {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+
+            let osc = audioCtx.createOscillator();
+            let gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(mainVolume);
+
+            if (type === 'kick') {
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(vol * 1.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'snare') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(vol * 0.8, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        }
+
+        function startMusic() {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            if (musicInterval) clearInterval(musicInterval);
+
+            musicInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') return;
+
+                let step = beatCounter % 16;
+                let chordIndex = Math.floor(beatCounter / 16) % bassNotes.length;
+                let currentBass = bassNotes[chordIndex];
+
+                let speedMod = Math.min(200, score * 2);
+
+                if (step % 4 === 0) playDrum('kick', 0.7);
+                if (step % 4 === 2) playDrum('snare', 0.5);
+
+                if (step % 2 === 0) {
+                    playSynthTone(currentBass, 'sawtooth', 0.22, 0.4, -10);
+                    playSynthTone(currentBass * 1.01, 'sawtooth', 0.22, 0.4, 10); 
+                }
+
+                if (step % 3 === 0 && Math.random() > 0.3) {
+                    let note = leadNotes[Math.floor(Math.random() * leadNotes.length)];
+                    playSynthTone(note, 'triangle', 0.3, 0.35, speedMod);
+                }
+                
+                if (score > 15 && step % 7 === 0) {
+                    let highNote = leadNotes[Math.floor(Math.random() * leadNotes.length)] * 2;
+                    playSynthTone(highNote, 'square', 0.15, 0.15);
+                }
+
+                beatCounter++;
+            }, 110); 
+        }
+
+        function playSFX(type) {
+            if (!audioCtx) return;
+            if (type === 'gameover') {
+                playSynthTone(180, 'sawtooth', 0.8, 0.8);
+                playSynthTone(120, 'square', 0.8, 0.5);
+                playSynthTone(60, 'triangle', 1.2, 0.9);
+            } else if (type === 'scoreUp') {
+                playSynthTone(600, 'square', 0.05, 0.2);
+            } else if (type === 'starCollect') {
+                // Energetic power explosion sound for the EMP
+                playSynthTone(150, 'sawtooth', 0.4, 0.6);
+                playSynthTone(400, 'square', 0.3, 0.4);
+                playSynthTone(800, 'sine', 0.5, 0.5);
+            }
+        }
+
+        // ==========================================
+
+        // Interaction Event Listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', resetGame);
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys) keys[key] = true;
+            
+            if (gameState === 'START' && e.key === 'Enter') {
+                startGame();
+            }
+            if (gameState === 'GAMEOVER' && e.code === 'Space') {
+                resetGame();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys) keys[key] = false;
+        });
+
+        function startGame() {
+            gameState = 'PLAYING';
+            startScreen.style.display = 'none';
+            scoreboard.style.opacity = '1';
+            startMusic();
+            loop();
+        }
+
+        function spawnEnemy() {
+            const size = Math.random() * 20 + 15; 
+            let x, y, speedX, speedY;
+
+            const edge = Math.floor(Math.random() * 4);
+            const baseSpeed = 2 + (score * 0.1); 
+
+            if (edge === 0) { // Top
+                x = Math.random() * canvas.width;
+                y = -size;
+                speedX = (Math.random() - 0.5) * baseSpeed;
+                speedY = Math.random() * baseSpeed + 1;
+            } else if (edge === 1) { // Right
+                x = canvas.width + size;
+                y = Math.random() * canvas.height;
+                speedX = -(Math.random() * baseSpeed + 1);
+                speedY = (Math.random() - 0.5) * baseSpeed;
+            } else if (edge === 2) { // Bottom
+                x = Math.random() * canvas.width;
+                y = canvas.height + size;
+                speedX = (Math.random() - 0.5) * baseSpeed;
+                speedY = -(Math.random() * baseSpeed + 1);
+            } else { // Left
+                x = -size;
+                y = Math.random() * canvas.height;
+                speedX = Math.random() * baseSpeed + 1;
+                speedY = (Math.random() - 0.5) * baseSpeed;
+            }
+
+            const seekerChance = Math.min(0.6, score * 0.025);
+            const isSeeker = Math.random() < seekerChance;
+
+            enemies.push({ 
+                x, 
+                y, 
+                size, 
+                speedX, 
+                speedY, 
+                baseSpeed: baseSpeed * 0.9, 
+                type: isSeeker ? 'seeker' : 'standard',
+                color: isSeeker ? '#ffea00' : '#ff007f', 
+                redirectCount: 0, // Keeps track of shifts (limit to 2)
+                spawnFrame: frameCount
+            });
+        }
+
+        function spawnStar() {
+            currentStar = {
+                x: Math.random() * (canvas.width - 100) + 50,
+                y: Math.random() * (canvas.height - 100) + 50,
+                radius: 14,
+                angle: 0,
+                pulse: 0
+            };
+        }
+
+        function drawStar(cx, cy, spikes, outerRadius, innerRadius, angle, color) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / spikes;
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        // Standard Circle vs Box collision
+        function checkCollision(circle, rect) {
+            let closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.size));
+            let closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.size));
+
+            let distanceX = circle.x - closestX;
+            let distanceY = circle.y - closestY;
+            let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+
+            return distanceSquared < (circle.radius * circle.radius);
+        }
+
+        // Precise Ring vs Box collision for EMP blast wave
+        function checkRingCollision(cx, cy, currentRadius, thickness, rect) {
+            let closestX = Math.max(rect.x, Math.min(cx, rect.x + rect.size));
+            let closestY = Math.max(rect.y, Math.min(cy, rect.y + rect.size));
+
+            let distXSq = (cx - closestX) * (cx - closestX);
+            let distYSq = (cy - closestY) * (cy - closestY);
+            let distance = Math.sqrt(distXSq + distYSq);
+
+            // True if the bounding box intersects the leading expanding edge of the blast ring
+            return (distance >= currentRadius - thickness && distance <= currentRadius + 10);
+        }
+
+        function resetGame() {
+            score = 0;
+            enemies = [];
+            currentStar = null;
+            activePulses = [];
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            gameState = 'PLAYING';
+            frameCount = 0;
+            spawnInterval = 40;
+            scoreEl.innerText = score;
+            gameOverScreen.style.display = 'none';
+            startMusic();
+            loop();
+        }
+
+        // Core Game Loop
+        function loop() {
+            if (gameState !== 'PLAYING') return;
+
+            ctx.fillStyle = 'rgba(18, 19, 28, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Move Player
+            if (keys.w && player.y - player.radius > 0) player.y -= player.speed;
+            if (keys.s && player.y + player.radius < canvas.height) player.y += player.speed;
+            if (keys.a && player.x - player.radius > 0) player.x -= player.speed;
+            if (keys.d && player.x + player.radius < canvas.width) player.x += player.speed;
+
+            // Draw Player
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.glow;
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+
+            // 2. Manage Stars
+            if (!currentStar && frameCount > 0 && frameCount % 350 === 0) {
+                spawnStar();
+            }
+
+            if (currentStar) {
+                currentStar.angle += 0.04; 
+                currentStar.pulse += 0.1;
+                let activeRadius = currentStar.radius + Math.sin(currentStar.pulse) * 2;
+
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00f2fe';
+                
+                ctx.save();
+                ctx.translate(currentStar.x, currentStar.y);
+                ctx.rotate(currentStar.angle);
+                drawStar(0, 0, 5, activeRadius, activeRadius / 2, 0, '#ffffff');
+                drawStar(0, 0, 5, activeRadius * 0.7, activeRadius * 0.35, Math.PI, '#00f2fe');
+                ctx.restore();
+
+                let dstX = player.x - currentStar.x;
+                let dstY = player.y - currentStar.y;
+                let dist = Math.sqrt(dstX * dstX + dstY * dstY);
+
+                if (dist < player.radius + currentStar.radius) {
+                    score += 5; 
+                    scoreEl.innerText = score;
+                    playSFX('starCollect');
+                    
+                    // Trigger EMP Bomb shockwave power centered on the player
+                    activePulses.push({
+                        x: player.x,
+                        y: player.y,
+                        radius: 10,
+                        maxRadius: Math.max(canvas.width, canvas.height),
+                        speed: 12
+                    });
+                    
+                    currentStar = null; 
+                }
+            }
+
+            // 3. Render and process EMP Shockwaves
+            for (let p = activePulses.length - 1; p >= 0; p--) {
+                let pulse = activePulses[p];
+                pulse.radius += pulse.speed;
+
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = '#00f2fe';
+                ctx.strokeStyle = `rgba(0, 242, 254, ${1 - (pulse.radius / pulse.maxRadius)})`;
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.closePath();
+
+                if (pulse.radius >= pulse.maxRadius) {
+                    activePulses.splice(p, 1);
+                }
+            }
+
+            // 4. Manage Enemies
+            frameCount++;
+            let dynamicSpawnRate = Math.max(10, spawnInterval - Math.floor(score / 5));
+            if (frameCount % dynamicSpawnRate === 0) {
+                spawnEnemy();
+                score++;
+                scoreEl.innerText = score;
+                playSFX('scoreUp'); 
+            }
+
+            // Update & Draw Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+
+                // SHIFT PATH MECHANISM: Shifts direction towards user exactly 2 times max
+                if (e.type === 'seeker' && e.redirectCount < 2) {
+                    let relativeFrame = frameCount - e.spawnFrame;
+                    // First shift at 40 frames, second shift at 90 frames
+                    if (relativeFrame === 40 || relativeFrame === 90) {
+                        let targetX = player.x - (e.x + e.size / 2);
+                        let targetY = player.y - (e.y + e.size / 2);
+                        let distance = Math.sqrt(targetX * targetX + targetY * targetY);
+                        
+                        if (distance > 5) {
+                            e.speedX = (targetX / distance) * e.baseSpeed;
+                            e.speedY = (targetY / distance) * e.baseSpeed;
+                            e.redirectCount++;
+                        }
+                    }
+                }
+
+                e.x += e.speedX;
+                e.y += e.speedY;
+
+                // Check for EMP Shockwave elimination
+                let destroyedByPulse = false;
+                for (let pulse of activePulses) {
+                    if (checkRingCollision(pulse.x, pulse.y, pulse.radius, 15, e)) {
+                        destroyedByPulse = true;
+                        break;
+                    }
+                }
+
+                if (destroyedByPulse) {
+                    enemies.splice(i, 1);
+                    score++; // Bonus points for clearing squares
+                    scoreEl.innerText = score;
+                    continue;
+                }
+
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = e.color;
+                ctx.fillStyle = e.color;
+                ctx.fillRect(e.x, e.y, e.size, e.size);
+
+                if (checkCollision(player, e)) {
+                    gameState = 'GAMEOVER';
+                    playSFX('gameover');
+                    if (score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('neonDodgeHighScore', highScore);
+                        highScoreEl.innerText = highScore;
+                    }
+                    gameOverScreen.style.display = 'flex';
+                }
+
+                if (e.x < -100 || e.x > canvas.width + 100 || e.y < -100 || e.y > canvas.height + 100) {
+                    enemies.splice(i, 1);
+                }
+            }
+            
+            ctx.shadowBlur = 0;
+
+            requestAnimationFrame(loop);
+        }
+
+        ctx.fillStyle = '#12131c';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    </script>
+</body>
+</html>
