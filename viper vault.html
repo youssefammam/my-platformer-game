@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPER VAULT</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0c0c14;
+            color: #f1f1f6;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-wrapper {
+            position: relative;
+            width: 640px;
+            background: #14141f;
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+            border: 1px solid #28283d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding: 0 4px;
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #ff3366;
+            text-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 12px;
+        }
+
+        .score-box {
+            background: #1d1d2c;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #8f8fa8;
+            letter-spacing: 0.5px;
+            border: 1px solid #2a2a3d;
+        }
+
+        .score-box span {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        canvas {
+            background-color: #07070b;
+            display: block;
+            border-radius: 10px;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+            border: 1px solid #1f1f2e;
+        }
+
+        .screen {
+            position: absolute;
+            top: 83px;
+            left: 24px;
+            width: 592px;
+            height: 592px;
+            background: rgba(12, 12, 20, 0.95);
+            backdrop-filter: blur(6px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            text-align: center;
+            padding: 40px;
+            border-radius: 10px;
+        }
+
+        .screen h1 {
+            font-size: 44px;
+            color: #ff3366;
+            margin-bottom: 12px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+        }
+
+        .screen p {
+            font-size: 15px;
+            color: #9c9cb8;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            max-width: 420px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ff3366, #ff6633);
+            color: #ffffff;
+            border: none;
+            padding: 14px 38px;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(255, 51, 102, 0.4);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 51, 102, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .controls-hint {
+            margin-top: 18px;
+            font-size: 12px;
+            color: #5c5c78;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <div class="header">
+            <div class="title">VIPER VAULT</div>
+            <div class="stats-container">
+                <div class="score-box">SCORE: <span id="currentScore">0</span></div>
+                <div class="score-box">RECORD: <span id="highScore">0</span></div>
+            </div>
+        </div>
+
+        <!-- Larger Screen Canvas (592x592 pixels, 37 grid cells) -->
+        <canvas id="gameCanvas" width="592" height="592"></canvas>
+
+        <!-- Main Menu Screen -->
+        <div id="mainMenu" class="screen">
+            <h1>VIPER VAULT</h1>
+            <p>Navigate the expanded vault grid with ultra-smooth responsive motion. Devour energy cores to grow, but do not strike walls or your own crimson trail.</p>
+            <button class="btn" onclick="startGame()">ENTER VAULT</button>
+            <div class="controls-hint">CONTROLS: ARROW KEYS OR WASD</div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen hidden">
+            <h1>VAULT BREACHED</h1>
+            <p>Your viper crashed!<br>Final Score: <span id="finalScore" style="color: #ffffff; font-weight: bold;">0</span></p>
+            <button class="btn" onclick="startGame()">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const tileSize = 16;
+        const gridCount = 37; // 37 * 16 = 592px large map area
+
+        let snake = [];
+        let food = { x: 0, y: 0, anim: 0 };
+        let direction = { x: 1, y: 0 };
+        let nextDirection = { x: 1, y: 0 };
+        let score = 0;
+        let highScore = localStorage.getItem("viperVaultHighScore") || 0;
+        let gameRunning = false;
+        let lastUpdateTime = 0;
+        let moveInterval = 110;
+        let accumulatedTime = 0;
+
+        document.getElementById("highScore").innerText = highScore;
+
+        // High-Gain Web Audio Setup (Loud, punchy arcade sounds)
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'eat') {
+                // Punchy, loud high-frequency chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(1100, now + 0.12);
+                gainNode.gain.setValueAtTime(0.5, now); // High volume gain
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } else if (type === 'gameOver') {
+                // Heavy, booming explosion / crash tone
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(35, now + 0.45);
+                gainNode.gain.setValueAtTime(0.7, now); // Very loud impact volume
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            }
+        }
+
+        // Input Handling with Buffer Controls
+        window.addEventListener("keydown", e => {
+            if (!gameRunning) return;
+            const key = e.key;
+
+            if ((key === "ArrowUp" || key === "w" || key === "W") && direction.y === 0) {
+                nextDirection = { x: 0, y: -1 };
+            } else if ((key === "ArrowDown" || key === "s" || key === "S") && direction.y === 0) {
+                nextDirection = { x: 0, y: 1 };
+            } else if ((key === "ArrowLeft" || key === "a" || key === "A") && direction.x === 0) {
+                nextDirection = { x: -1, y: 0 };
+            } else if ((key === "ArrowRight" || key === "d" || key === "D") && direction.x === 0) {
+                nextDirection = { x: 1, y: 0 };
+            }
+        });
+
+        function startGame() {
+            initAudio();
+            document.getElementById("mainMenu").classList.add("hidden");
+            document.getElementById("gameOverScreen").classList.add("hidden");
+
+            // Reset state with longer initial snake for the large grid
+            snake = [
+                { x: 18, y: 18 },
+                { x: 17, y: 18 },
+                { x: 16, y: 18 },
+                { x: 15, y: 18 },
+                { x: 14, y: 18 }
+            ];
+            direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
+            score = 0;
+            moveInterval = 110;
+            document.getElementById("currentScore").innerText = score;
+
+            spawnFood();
+            gameRunning = true;
+            lastUpdateTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnFood() {
+            let valid = false;
+            while (!valid) {
+                food.x = Math.floor(Math.random() * gridCount);
+                food.y = Math.floor(Math.random() * gridCount);
+                valid = !snake.some(segment => segment.x === food.x && segment.y === food.y);
+            }
+        }
+
+        function update() {
+            direction = nextDirection;
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            // Wall Collision Check
+            if (head.x < 0 || head.x >= gridCount || head.y < 0 || head.y >= gridCount) {
+                gameOver();
+                return;
+            }
+
+            // Self Collision Check
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // Food Collection Check
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                document.getElementById("currentScore").innerText = score;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem("viperVaultHighScore", highScore);
+                    document.getElementById("highScore").innerText = highScore;
+                }
+                playSound('eat');
+                spawnFood();
+
+                // Dynamic speed scaling on larger screen
+                if (moveInterval > 65) moveInterval -= 1.2;
+            } else {
+                snake.pop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            playSound('gameOver');
+            document.getElementById("finalScore").innerText = score;
+            document.getElementById("gameOverScreen").classList.remove("hidden");
+        }
+
+        function draw() {
+            // Clear background
+            ctx.fillStyle = "#07070b";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw subtle fine grid pattern
+            ctx.strokeStyle = "#101018";
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gridCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * tileSize, 0);
+                ctx.lineTo(i * tileSize, canvas.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * tileSize);
+                ctx.lineTo(canvas.width, i * tileSize);
+                ctx.stroke();
+            }
+
+            // Draw Pulsing Energy Core Food
+            food.anim += 0.1;
+            let pulse = Math.sin(food.anim) * 1.8;
+            ctx.fillStyle = "#ffcc00";
+            ctx.beginPath();
+            ctx.roundRect(
+                food.x * tileSize + 3 - pulse / 2, 
+                food.y * tileSize + 3 - pulse / 2, 
+                tileSize - 6 + pulse, 
+                tileSize - 6 + pulse, 
+                4
+            );
+            ctx.fill();
+
+            // Draw Viper Snake Body
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? "#ff3366" : "#cc2250";
+                
+                let padding = index === 0 ? 1 : 2;
+                let radius = index === 0 ? 5 : 3;
+
+                ctx.beginPath();
+                ctx.roundRect(
+                    segment.x * tileSize + padding, 
+                    segment.y * tileSize + padding, 
+                    tileSize - (padding * 2), 
+                    tileSize - (padding * 2), 
+                    radius
+                );
+                ctx.fill();
+            });
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            let deltaTime = timestamp - lastUpdateTime;
+            accumulatedTime += deltaTime;
+            lastUpdateTime = timestamp;
+
+            while (accumulatedTime >= moveInterval) {
+                update();
+                accumulatedTime -= moveInterval;
+                if (!gameRunning) return;
+            }
+
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
