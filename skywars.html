@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SKY WARS: ARCADE EVOLUTION</title>
+    <style>
+        :root {
+            --bg-color: #05050f;
+            --panel-bg: rgba(10, 10, 25, 0.95);
+            --primary: #00ffcc;
+            --accent: #ff00ff;
+            --danger: #ff2255;
+            --text: #ffffff;
+        }
+
+        body { 
+            margin: 0; 
+            background: var(--bg-color); 
+            color: var(--primary); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        #gameCanvas { 
+            border: 2px solid rgba(0, 255, 204, 0.4); 
+            background: linear-gradient(180deg, #070716 0%, #020208 100%); 
+            box-shadow: 0 0 35px rgba(0, 255, 204, 0.12); 
+            border-radius: 8px;
+            cursor: none; 
+        }
+
+        .menu { 
+            position: absolute; 
+            text-align: center; 
+            background: var(--panel-bg); 
+            backdrop-filter: blur(10px);
+            padding: 40px; 
+            border: 2px solid rgba(0, 255, 204, 0.3); 
+            border-radius: 12px;
+            width: 440px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        h1 { 
+            font-size: 42px; 
+            color: var(--text); 
+            letter-spacing: 3px;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+        }
+
+        .tagline { 
+            color: var(--accent); 
+            font-size: 15px; 
+            margin-bottom: 25px; 
+            line-height: 1.5; 
+            font-weight: 500;
+        }
+
+        .instructions { 
+            font-size: 13px; 
+            margin-bottom: 30px; 
+            line-height: 1.6; 
+            color: #a0a0c0;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: left;
+        }
+
+        button { 
+            background: transparent; 
+            border: 2px solid var(--primary); 
+            color: var(--primary); 
+            padding: 12px 35px; 
+            font-size: 16px; 
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            letter-spacing: 1px;
+        }
+
+        button:hover { 
+            background: var(--primary); 
+            color: #000; 
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            transform: translateY(-2px);
+        }
+
+        #gameOverMenu { display: none; }
+    </style>
+</head>
+<body>
+    <div id="mainMenu" class="menu">
+        <h1>Sky Wars</h1>
+        <div class="tagline">Enhanced Arcade Dogfight</div>
+        <div class="instructions">
+            <strong>Controls:</strong> Arrow Keys / A & D to Move<br>
+            <strong>Fire:</strong> Hold Space (Auto-Rapid)<br>
+            <em>Features dynamic sounds, 30s power-ups, and combo scoring!</em>
+        </div>
+        <button onclick="initGame()">PLAY GAME</button>
+    </div>
+    
+    <div id="gameOverMenu" class="menu">
+        <h1 style="color: var(--danger);">Game Over</h1>
+        <div class="tagline" style="color: #ff88a0;">Your ship was destroyed in battle.</div>
+        <p id="finalScore" style="font-size: 18px; color: var(--text); margin-bottom: 25px; font-weight: 600;"></p>
+        <button onclick="initGame()">PLAY AGAIN</button>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="700"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d");
+        let audioCtx = null;
+        let gameRunning = false, score = 0, health = 3, shake = 0, spawnTimer = 0, combo = 0, comboTimer = 0;
+        let player = { x: 385, y: 600, width: 26, height: 26 }, bullets = [], enemies = [], eBullets = [], stars = [], explosions = [], particles = [], floatingTexts = [], powerups = [], keys = {};
+        
+        let activeWeapon = 'normal', weaponTimer = 0, hasArmor = false, fireCooldown = 0;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Advanced Procedural Sound Synthesizer
+        function playSfx(type) {
+            if (!audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'shoot') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(650, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, now);
+                    osc.frequency.linearRampToValueAtTime(40, now + 0.15);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'explosion') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'powerup') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.25);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'damage') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(90, now);
+                    osc.frequency.linearRampToValueAtTime(20, now + 0.35);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                }
+            } catch(e) {}
+        }
+
+        for(let i=0; i<150; i++) {
+            stars.push({
+                x: Math.random()*800, 
+                y: Math.random()*700, 
+                s: Math.random()*2 + 0.5, 
+                speed: Math.random()*1.2 + 0.3,
+                alpha: Math.random() * 0.7 + 0.3
+            });
+        }
+
+        window.onkeydown = (e) => keys[e.code] = true;
+        window.onkeyup = (e) => keys[e.code] = false;
+
+        function initGame() {
+            initAudio();
+            document.getElementById("mainMenu").style.display = "none";
+            document.getElementById("gameOverMenu").style.display = "none";
+            score = 0; health = 3; spawnTimer = 0; combo = 0; comboTimer = 0;
+            enemies = []; bullets = []; eBullets = []; explosions = []; particles = []; floatingTexts = []; powerups = [];
+            activeWeapon = 'normal'; weaponTimer = 0; hasArmor = false; fireCooldown = 0;
+            player.x = 385; player.y = 600;
+            gameRunning = true; spawnGroup(); loop();
+        }
+
+        function spawnGroup() {
+            let difficulty = Math.min(score / 350, 4.5);
+            let count = 3 + Math.floor(difficulty * 0.5);
+            let spacing = 700 / (count + 1);
+            
+            for(let i = 0; i < count; i++) {
+                let typeRoll = Math.random();
+                let isSniper = typeRoll < (0.15 + difficulty * 0.02);
+                let isTank = !isSniper && typeRoll > (0.85 - difficulty * 0.03); // Added Tank type for extra fun variety
+                let targetY = 70 + Math.random() * 120;
+                let assignedX = 60 + spacing * (i + 1) + (Math.random() * 30 - 15);
+                
+                enemies.push({ 
+                    x: assignedX, 
+                    y: -50, 
+                    targetY: targetY,
+                    vx: (Math.random() - 0.5) * 1.5,
+                    speed: 0.8 + (difficulty * 0.1),
+                    isSniper: isSniper,
+                    isTank: isTank,
+                    hp: isTank ? 3 : (isSniper ? 2 : 1),
+                    maxHp: isTank ? 3 : (isSniper ? 2 : 1),
+                    width: isTank ? 32 : 26,
+                    height: isTank ? 32 : 26
+                });
+            }
+        }
+
+        function spawnParticles(x, y, color, count = 8) {
+            for(let i=0; i<count; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = Math.random() * 2.5 + 0.8;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.05 + 0.03
+                });
+            }
+        }
+
+        function addFloatingText(text, x, y, color = '#00ffcc') {
+            floatingTexts.push({ text: text, x: x, y: y, alpha: 1, color: color });
+        }
+
+        function loop() {
+            if (!gameRunning) return;
+            
+            let difficulty = Math.min(score / 350, 4.5);
+
+            // Combo timeout tracking
+            if (comboTimer > 0) {
+                comboTimer--;
+                if (comboTimer <= 0) combo = 0;
+            }
+
+            spawnTimer++;
+            let spawnInterval = Math.max(70, 140 - Math.floor(difficulty * 12));
+            if (spawnTimer >= spawnInterval && enemies.length < 6) {
+                spawnGroup();
+                spawnTimer = 0;
+            }
+
+            let moveSpeed = 6.5;
+            let moveX = 0;
+            if (keys["ArrowLeft"] || keys["KeyA"]) moveX = -moveSpeed;
+            if (keys["ArrowRight"] || keys["KeyD"]) moveX = moveSpeed;
+            
+            player.x += moveX;
+            player.x = Math.max(25, Math.min(745, player.x));
+
+            if (Math.random() < 0.4) {
+                particles.push({
+                    x: player.x + 13 + (Math.random()*4 - 2),
+                    y: player.y + 26,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: Math.random() * 2 + 1.5,
+                    color: '#00ffcc',
+                    alpha: 0.7,
+                    decay: 0.08
+                });
+            }
+
+            if (weaponTimer > 0) {
+                weaponTimer--;
+                if (weaponTimer <= 0) activeWeapon = 'normal';
+            }
+
+            if (fireCooldown > 0) fireCooldown--;
+            
+            let maxBullets = (activeWeapon === 'rapid') ? 22 : 6;
+            let cooldownThreshold = (activeWeapon === 'rapid') ? 4 : 12; // Snappy rapid fire rate
+
+            if (keys["Space"] && bullets.length < maxBullets && fireCooldown === 0) { 
+                if (activeWeapon === 'triple') {
+                    bullets.push({ x: player.x+12, y: player.y, vx: 0, color: '#00ffff', width: 3, height: 12 });
+                    bullets.push({ x: player.x+12, y: player.y, vx: -1.8, color: '#00ffff', width: 3, height: 12 });
+                    bullets.push({ x: player.x+12, y: player.y, vx: 1.8, color: '#00ffff', width: 3, height: 12 });
+                    playSfx('shoot');
+                } else if (activeWeapon === 'rapid') {
+                    bullets.push({ x: player.x+12, y: player.y, vx: (Math.random()-0.5)*0.3, color: '#ffff00', width: 3, height: 12 });
+                    playSfx('shoot');
+                } else {
+                    bullets.push({ x: player.x+12, y: player.y, vx: 0, color: '#00ffcc', width: 3, height: 12 });
+                    playSfx('shoot');
+                    keys["Space"] = false; 
+                }
+                fireCooldown = cooldownThreshold;
+            }
+
+            bullets.forEach((b, i) => { 
+                b.y -= 12; 
+                if (b.vx) b.x += b.vx;
+                if(b.y < 0) bullets.splice(i, 1); 
+            });
+            
+            enemies.forEach((e, i) => {
+                if(e.y < e.targetY) {
+                    e.y += e.speed;
+                    if(e.y > e.targetY) e.y = e.targetY;
+                }
+
+                e.x += e.vx;
+                if (e.x < 40) { e.x = 40; e.vx *= -1; }
+                if (e.x > 730) { e.x = 730; e.vx *= -1; }
+
+                for (let j = i + 1; j < enemies.length; j++) {
+                    let other = enemies[j];
+                    let dx = other.x - e.x;
+                    let minDist = 45;
+                    if (Math.abs(dx) < minDist) {
+                        let overlap = minDist - Math.abs(dx);
+                        let pushDir = dx > 0 ? -1 : 1;
+                        e.x += pushDir * (overlap / 2);
+                        other.x -= pushDir * (overlap / 2);
+                        let tempVx = e.vx;
+                        e.vx = other.vx;
+                        other.vx = tempVx;
+                    }
+                }
+
+                let fireRate = (e.isSniper ? 0.0022 : (e.isTank ? 0.0018 : 0.001)) + (difficulty * 0.0004);
+                if(Math.random() < fireRate) {
+                    playSfx('hit');
+                    let bulletSpeed = 3.8 + (difficulty * 0.3);
+                    if (e.isSniper) {
+                        let angle = Math.atan2((player.y) - (e.y + 22), (player.x + 13) - (e.x + 13));
+                        eBullets.push({ x: e.x + 13, y: e.y + 22, vx: Math.cos(angle) * bulletSpeed, vy: Math.sin(angle) * bulletSpeed, width: 4, height: 10 });
+                    } else {
+                        eBullets.push({ x: e.x + 13, y: e.y + 22, vx: 0, vy: bulletSpeed, width: 4, height: 10 });
+                    }
+                }
+            });
+
+            eBullets.forEach((b, i) => { 
+                b.y += b.vy !== undefined ? b.vy : 4; 
+                if (b.vx) b.x += b.vx;
+
+                if(b.x < player.x + player.width && b.x + b.width > player.x &&
+                   b.y < player.y + player.height && b.y + b.height > player.y) {
+                    eBullets.splice(i, 1); 
+                    shake = 10; 
+                    spawnParticles(player.x + 13, player.y + 13, '#ff2255', 6);
+                    playSfx('damage');
+                    
+                    if (hasArmor) {
+                        hasArmor = false;
+                        addFloatingText("SHIELD BREAK!", player.x, player.y - 15, '#00ffcc');
+                    } else {
+                        health--;
+                        combo = 0; // Reset combo on damage
+                        if(health <= 0) { 
+                            gameRunning = false; 
+                            document.getElementById("gameOverMenu").style.display = "block"; 
+                            document.getElementById("finalScore").innerText = "Final Score: " + score; 
+                        }
+                    }
+                }
+                if(b.y > 720 || b.y < -30 || b.x < -30 || b.x > 830) eBullets.splice(i, 1);
+            });
+
+            powerups.forEach((p, i) => {
+                p.y += 1.8; 
+                if(p.x < player.x + player.width && p.x + p.width > player.x &&
+                   p.y < player.y + player.height && p.y + p.height > player.y) {
+                    if(p.type === 'hp' && health < 5) { health++; addFloatingText("+1 HP", p.x, p.y, '#ff00ff'); }
+                    else if(p.type === 'triple') { activeWeapon = 'triple'; weaponTimer = 1800; addFloatingText("TRIPLE SHOT!", p.x, p.y, '#00ffff'); }
+                    else if(p.type === 'rapid') { activeWeapon = 'rapid'; weaponTimer = 1800; addFloatingText("RAPID FIRE (30s)!", p.x, p.y, '#ffff00'); } // 30 seconds (1800 frames at 60fps)
+                    else if(p.type === 'armor') { hasArmor = true; addFloatingText("SHIELD ON!", p.x, p.y, '#00ff88'); }
+                    
+                    score += 30;
+                    powerups.splice(i, 1);
+                    spawnParticles(player.x + 13, player.y + 13, '#00ffcc', 10);
+                    playSfx('powerup');
+                }
+                if(p.y > 700) powerups.splice(i, 1);
+            });
+
+            enemies.forEach((e, ei) => {
+                bullets.forEach((b, bi) => {
+                    if(b.x < e.x + e.width && b.x + b.width > e.x &&
+                       b.y < e.y + e.height && b.y + b.height > e.y) {
+                        bullets.splice(bi, 1);
+                        
+                        e.hp--;
+                        if (e.hp <= 0) {
+                            explosions.push({x: e.x+13, y: e.y+13, r: 8, a: 1});
+                            spawnParticles(e.x+13, e.y+13, e.isSniper ? '#ff00ff' : (e.isTank ? '#ffaa00' : '#ff7700'), 8);
+                            
+                            combo++;
+                            comboTimer = 150; // 2.5 seconds combo window
+                            let comboMultiplier = Math.min(combo, 5);
+                            let baseScore = e.isTank ? 50 : (e.isSniper ? 40 : 20);
+                            let earnedPoints = baseScore * comboMultiplier;
+                            score += earnedPoints;
+
+                            if (combo > 1) {
+                                addFloatingText(`${combo}x COMBO (+${earnedPoints})`, e.x, e.y, '#ffff00');
+                            }
+                            
+                            if(Math.random() < 0.28) {
+                                const types = ['hp', 'triple', 'rapid', 'armor'];
+                                const chosenType = types[Math.floor(Math.random() * types.length)];
+                                powerups.push({ x: e.x + 3, y: e.y + 3, type: chosenType, width: 22, height: 22 });
+                            }
+
+                            enemies.splice(ei, 1); 
+                            shake = 3;
+                            playSfx('explosion');
+                        } else {
+                            spawnParticles(b.x, b.y, '#ffffff', 2);
+                            playSfx('hit');
+                        }
+                    }
+                });
+            });
+
+            let dx = 0, dy = 0; 
+            if(shake > 0) { 
+                dx = (Math.random()-0.5)*shake; 
+                dy = (Math.random()-0.5)*shake; 
+                shake--; 
+            }
+
+            ctx.save(); 
+            ctx.translate(dx, dy);
+            ctx.fillStyle = "#05050f"; 
+            ctx.fillRect(0,0,800,700);
+            
+            stars.forEach(s => {
+                s.y += s.speed; 
+                if(s.y > 700) s.y = 0;
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
+                ctx.fillRect(s.x, s.y, s.s, s.s);
+            });
+
+            explosions.forEach((ex, i) => { 
+                ex.r += 1.8; ex.a -= 0.06; 
+                ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI*2); 
+                ctx.fillStyle = `rgba(255, 150, 50, ${ex.a})`; ctx.fill(); 
+                if(ex.a <= 0) explosions.splice(i, 1); 
+            });
+
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillRect(p.x, p.y, 2, 2);
+                ctx.globalAlpha = 1.0;
+                if(p.alpha <= 0) particles.splice(i, 1);
+            });
+
+            floatingTexts.forEach((ft, i) => {
+                ft.y -= 0.8;
+                ft.alpha -= 0.02;
+                ctx.fillStyle = ft.color;
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.font = "bold 12px sans-serif";
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.globalAlpha = 1.0;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            });
+
+            powerups.forEach(p => {
+                let color = '#fff', label = '';
+                if(p.type === 'hp') { color = '#ff00ff'; label = '+'; }
+                else if(p.type === 'triple') { color = '#00ffff'; label = '3X'; }
+                else if(p.type === 'rapid') { color = '#ffff00'; label = 'RP'; }
+                else if(p.type === 'armor') { color = '#00ff88'; label = 'SH'; }
+
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.arc(p.x+11, p.y+11, 10, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = "#05050f"; ctx.font = "bold 10px sans-serif"; 
+                ctx.fillText(label, p.x + (p.type === 'triple' ? 3 : 6), p.y + 15);
+            });
+
+            if(hasArmor) {
+                ctx.strokeStyle = "#00ffcc"; ctx.lineWidth = 2;
+                ctx.shadowColor = "#00ffcc"; ctx.shadowBlur = 8;
+                ctx.beginPath(); ctx.arc(player.x+13, player.y+13, 20, 0, Math.PI*2); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            
+            ctx.shadowColor = "#00ffcc"; ctx.shadowBlur = 6;
+            ctx.fillStyle = "#00ffcc"; 
+            ctx.beginPath(); ctx.moveTo(player.x+13, player.y); ctx.lineTo(player.x+26, player.y+26); ctx.lineTo(player.x, player.y+26); ctx.fill();
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath(); ctx.moveTo(player.x+13, player.y+6); ctx.lineTo(player.x+17, player.y+18); ctx.lineTo(player.x+9, player.y+18); ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            enemies.forEach(e => { 
+                let eColor = e.isSniper ? "#b000b0" : (e.isTank ? "#cc6600" : "#d01030");
+                let glowColor = e.isSniper ? "#ff00ff" : (e.isTank ? "#ffaa00" : "#ff2255");
+                
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = eColor; 
+                ctx.beginPath(); 
+                if (e.isTank) {
+                    ctx.rect(e.x, e.y, e.width, e.height);
+                } else {
+                    ctx.moveTo(e.x+13, e.y+26); ctx.lineTo(e.x+26, e.y); ctx.lineTo(e.x, e.y);
+                }
+                ctx.fill(); 
+                ctx.shadowBlur = 0;
+            });
+
+            bullets.forEach(b => { 
+                ctx.fillStyle = b.color;
+                ctx.shadowColor = b.color; ctx.shadowBlur = 4;
+                ctx.fillRect(b.x, b.y, b.width, b.height); 
+                ctx.shadowBlur = 0;
+            });
+            
+            eBullets.forEach(b => { 
+                ctx.fillStyle = "#ffaa00"; 
+                ctx.shadowColor = "#ff5500"; ctx.shadowBlur = 4;
+                ctx.fillRect(b.x, b.y, b.width, b.height); 
+                ctx.shadowBlur = 0;
+            });
+            
+            ctx.fillStyle = "rgba(10, 10, 25, 0.85)";
+            ctx.fillRect(15, 15, 770, 36);
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.25)"; ctx.lineWidth = 1;
+            ctx.strokeRect(15, 15, 770, 36);
+
+            ctx.fillStyle = "#ffffff"; ctx.font = "bold 13px sans-serif";
+            let weaponStatusTxt = activeWeapon.toUpperCase();
+            if(activeWeapon !== 'normal') weaponStatusTxt += ` (${Math.ceil(weaponTimer/60)}s)`;
+            let armorTxt = hasArmor ? " | SHIELD ON" : "";
+            let comboTxt = combo > 1 ? ` | COMBO: ${combo}x` : "";
+            
+            ctx.fillText(`SCORE: ${score}   |   HP: ${health}   |   WEAPON: ${weaponStatusTxt}${armorTxt}${comboTxt}`, 30, 38);
+            
+            ctx.restore();
+            requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>
