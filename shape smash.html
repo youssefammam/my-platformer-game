@@ -23,8 +23,8 @@
         }
         #game-container {
             position: relative;
-            width: 520px;
-            height: 520px;
+            width: 620px;
+            height: 620px;
             border: 4px solid #39ff14;
             background: #020005;
             box-shadow: 0 0 35px rgba(57, 255, 20, 0.3), inset 0 0 20px rgba(255, 0, 127, 0.2);
@@ -49,16 +49,16 @@
             padding: 15px;
         }
         h1 {
-            font-size: 34px;
+            font-size: 38px;
             letter-spacing: 5px;
-            margin: 0 0 6px 0;
+            margin: 0 0 8px 0;
             color: #39ff14;
             text-shadow: 0 0 15px #39ff14, 0 0 30px #ff007f;
         }
         .subtitle {
-            font-size: 10px;
+            font-size: 11px;
             letter-spacing: 3px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             color: #00f3ff;
             text-transform: uppercase;
         }
@@ -66,13 +66,13 @@
             background: transparent;
             color: #39ff14;
             border: 2px solid #39ff14;
-            padding: 10px 30px;
-            font-size: 14px;
+            padding: 12px 35px;
+            font-size: 15px;
             font-family: 'Courier New', Courier, monospace;
             cursor: pointer;
             letter-spacing: 3px;
             transition: 0.3s;
-            margin: 6px;
+            margin: 8px;
             font-weight: bold;
             box-shadow: 0 0 12px rgba(57, 255, 20, 0.2);
             position: relative;
@@ -86,18 +86,18 @@
         }
         #hud {
             position: absolute;
-            top: 8px;
-            left: 10px;
-            right: 10px;
+            top: 10px;
+            left: 12px;
+            right: 12px;
             display: flex;
             justify-content: space-between;
-            font-size: 10px;
+            font-size: 11px;
             letter-spacing: 1px;
             pointer-events: none;
             z-index: 5;
             background: rgba(3, 1, 8, 0.85);
             border: 1px solid rgba(57, 255, 20, 0.4);
-            padding: 5px 10px;
+            padding: 6px 12px;
             color: #39ff14;
             box-shadow: 0 0 8px rgba(57, 255, 20, 0.2);
         }
@@ -106,15 +106,15 @@
         }
         .menu-box {
             border: 1px dashed rgba(0, 243, 255, 0.4);
-            padding: 18px 25px;
+            padding: 25px 35px;
             background: rgba(0, 0, 0, 0.5);
             box-shadow: inset 0 0 12px rgba(0, 243, 255, 0.1);
         }
         .controls-hint {
-            font-size: 9px;
+            font-size: 10px;
             color: #8c83a5;
-            margin-top: 15px;
-            line-height: 1.5;
+            margin-top: 18px;
+            line-height: 1.6;
             letter-spacing: 1px;
         }
         .stat-highlight {
@@ -133,7 +133,7 @@
         <div>LVL: <span id="level-val" class="stat-highlight">1</span></div>
     </div>
 
-    <canvas id="gameCanvas" width="520" height="520"></canvas>
+    <canvas id="gameCanvas" width="620" height="620"></canvas>
 
     <div id="menu-screen" class="screen">
         <div class="menu-box">
@@ -252,13 +252,13 @@
     let spacePressed = false;
     let mouseX = canvas.width / 2;
 
-    const basePaddleWidth = 85;
+    const basePaddleWidth = 100;
     let paddle = {
-        x: canvas.width / 2 - 42,
-        y: canvas.height - 35,
+        x: canvas.width / 2 - 50,
+        y: canvas.height - 40,
         width: basePaddleWidth,
-        height: 10,
-        dx: 9,
+        height: 12,
+        dx: 10,
         hasLasers: false,
         laserTimer: 0,
         hasShield: false
@@ -323,13 +323,13 @@
         let brickRowCount = Math.min(7, 3 + level);
         let brickColumnCount = Math.min(10, 6 + Math.floor(level / 2));
         
-        let brickWidth = Math.max(34, 44 - (level * 2));
-        let brickHeight = 14;
-        let brickPadding = 4;
+        let brickWidth = 52;
+        let brickHeight = 16;
+        let brickPadding = 6;
         
         let totalGridWidth = brickColumnCount * (brickWidth + brickPadding) - brickPadding;
         let brickOffsetLeft = (canvas.width - totalGridWidth) / 2;
-        let brickOffsetTop = 50;
+        let brickOffsetTop = 60;
 
         for (let c = 0; c < brickColumnCount; c++) {
             for (let r = 0; r < brickRowCount; r++) {
@@ -365,13 +365,13 @@
         paddle.hasLasers = false;
         paddle.hasShield = false;
 
-        let fixedSpeed = 6.2;
+        let fixedSpeed = 6.5;
         
         balls = [{
             x: canvas.width / 2,
-            y: paddle.y - 18,
-            radius: 6,
-            dx: 2.8 * (Math.random() > 0.5 ? 1 : -1),
+            y: paddle.y - 20,
+            radius: 7,
+            dx: 3 * (Math.random() > 0.5 ? 1 : -1),
             dy: -fixedSpeed,
             speed: fixedSpeed
         }];
@@ -385,12 +385,12 @@
 
     function shootLasers() {
         playSound('laser');
-        lasers.push({ x: paddle.x + 12, y: paddle.y, width: 3, height: 8, dy: -8 });
-        lasers.push({ x: paddle.x + paddle.width - 15, y: paddle.y, width: 3, height: 8, dy: -8 });
+        lasers.push({ x: paddle.x + 14, y: paddle.y, width: 4, height: 10, dy: -9 });
+        lasers.push({ x: paddle.x + paddle.width - 18, y: paddle.y, width: 4, height: 10, dy: -9 });
     }
 
     function spawnPowerUp(x, y) {
-        let shouldDrop = (Math.random() < 0.08); 
+        let shouldDrop = (Math.random() < 0.09); 
         
         if (shouldDrop) {
             const types = ['EX', 'MB', 'LS', 'SH'];
@@ -401,11 +401,11 @@
             }
 
             powerUps.push({
-                x: x + 12,
+                x: x + 15,
                 y: y,
-                width: 18,
-                height: 10,
-                dy: 2.2,
+                width: 20,
+                height: 12,
+                dy: 2.4,
                 type: type
             });
         }
@@ -414,7 +414,7 @@
     function drawShape(type, cx, cy, size, color) {
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
 
         if (type === 'circle') {
@@ -501,11 +501,11 @@
             if (p.x < paddle.x + paddle.width && p.x + p.width > paddle.x && p.y + p.height > paddle.y && p.y < paddle.y + paddle.height) {
                 playSound('powerup');
                 if (p.type === 'EX') {
-                    paddle.width = Math.min(canvas.width - 15, paddle.width + 30);
+                    paddle.width = Math.min(canvas.width - 20, paddle.width + 35);
                 } else if (p.type === 'MB') {
                     if (balls.length > 0) {
                         let b = balls[0];
-                        balls.push({ x: b.x, y: b.y, radius: 6, dx: -b.dx, dy: b.dy, speed: b.speed });
+                        balls.push({ x: b.x, y: b.y, radius: 7, dx: -b.dx, dy: b.dy, speed: b.speed });
                     }
                 } else if (p.type === 'LS') {
                     paddle.hasLasers = true;
@@ -536,8 +536,8 @@
                 playSound('hit');
             }
 
-            if (ball.y - ball.radius < 35) {
-                ball.y = 35 + ball.radius;
+            if (ball.y - ball.radius < 40) {
+                ball.y = 40 + ball.radius;
                 ball.dy = Math.abs(ball.dy);
                 playSound('hit');
             }
@@ -598,7 +598,7 @@
                 if (paddle.hasShield) {
                     paddle.hasShield = false;
                     ball.dy = -Math.abs(ball.dy);
-                    ball.y = paddle.y - 12;
+                    ball.y = paddle.y - 14;
                     playSound('shield');
                 } else {
                     balls.splice(i, 1);
@@ -639,10 +639,9 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // رسم حدود إضافية داخلية داخل الكانفاس لتوضيح الإطار (Boarders)
         ctx.strokeStyle = 'rgba(57, 255, 20, 0.2)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+        ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
 
         ctx.save();
         if (shakeTimer > 0) {
@@ -654,12 +653,12 @@
 
         if (paddle.hasShield) {
             ctx.strokeStyle = '#00f3ff';
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 3;
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#00f3ff';
             ctx.beginPath();
-            ctx.moveTo(20, canvas.height - 12);
-            ctx.lineTo(canvas.width - 20, canvas.height - 12);
+            ctx.moveTo(25, canvas.height - 14);
+            ctx.lineTo(canvas.width - 25, canvas.height - 14);
             ctx.stroke();
             ctx.shadowBlur = 0;
         }
@@ -679,8 +678,8 @@
                 
                 if (b.health > 1) {
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 8px Courier New';
-                    ctx.fillText(b.health + 'H', b.x + b.width / 2 - 5, b.y + b.height / 2 + 3);
+                    ctx.font = 'bold 9px Courier New';
+                    ctx.fillText(b.health + 'H', b.x + b.width / 2 - 6, b.y + b.height / 2 + 3);
                 }
 
                 ctx.shadowBlur = 0;
@@ -695,8 +694,8 @@
         
         if (paddle.hasLasers) {
             ctx.fillStyle = '#00f3ff';
-            ctx.fillRect(paddle.x + 10, paddle.y - 4, 3, 4);
-            ctx.fillRect(paddle.x + paddle.width - 13, paddle.y - 4, 3, 4);
+            ctx.fillRect(paddle.x + 12, paddle.y - 5, 4, 5);
+            ctx.fillRect(paddle.x + paddle.width - 16, paddle.y - 5, 4, 5);
         }
 
         for (let ball of balls) {
@@ -721,12 +720,12 @@
         for (let p of powerUps) {
             ctx.strokeStyle = '#ffe600';
             ctx.fillStyle = '#ffe600';
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1.8;
             ctx.shadowBlur = 6;
             ctx.shadowColor = '#ffe600';
             ctx.strokeRect(p.x, p.y, p.width, p.height);
-            ctx.font = 'bold 8px Courier New';
-            ctx.fillText(p.type, p.x + 3, p.y + 8);
+            ctx.font = 'bold 9px Courier New';
+            ctx.fillText(p.type, p.x + 3, p.y + 9);
             ctx.shadowBlur = 0;
         }
 
