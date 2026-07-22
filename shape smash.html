@@ -23,9 +23,9 @@
         }
         #game-container {
             position: relative;
-            width: 480px;
-            height: 600px;
-            border: 3px solid #39ff14;
+            width: 520px;
+            height: 520px;
+            border: 4px solid #39ff14;
             background: #020005;
             box-shadow: 0 0 35px rgba(57, 255, 20, 0.3), inset 0 0 20px rgba(255, 0, 127, 0.2);
         }
@@ -49,16 +49,16 @@
             padding: 15px;
         }
         h1 {
-            font-size: 36px;
-            letter-spacing: 6px;
-            margin: 0 0 8px 0;
+            font-size: 34px;
+            letter-spacing: 5px;
+            margin: 0 0 6px 0;
             color: #39ff14;
             text-shadow: 0 0 15px #39ff14, 0 0 30px #ff007f;
         }
         .subtitle {
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 3px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             color: #00f3ff;
             text-transform: uppercase;
         }
@@ -66,13 +66,13 @@
             background: transparent;
             color: #39ff14;
             border: 2px solid #39ff14;
-            padding: 12px 35px;
-            font-size: 15px;
+            padding: 10px 30px;
+            font-size: 14px;
             font-family: 'Courier New', Courier, monospace;
             cursor: pointer;
             letter-spacing: 3px;
             transition: 0.3s;
-            margin: 8px;
+            margin: 6px;
             font-weight: bold;
             box-shadow: 0 0 12px rgba(57, 255, 20, 0.2);
             position: relative;
@@ -86,18 +86,18 @@
         }
         #hud {
             position: absolute;
-            top: 10px;
-            left: 12px;
-            right: 12px;
+            top: 8px;
+            left: 10px;
+            right: 10px;
             display: flex;
             justify-content: space-between;
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 1px;
             pointer-events: none;
             z-index: 5;
             background: rgba(3, 1, 8, 0.85);
             border: 1px solid rgba(57, 255, 20, 0.4);
-            padding: 6px 12px;
+            padding: 5px 10px;
             color: #39ff14;
             box-shadow: 0 0 8px rgba(57, 255, 20, 0.2);
         }
@@ -106,15 +106,15 @@
         }
         .menu-box {
             border: 1px dashed rgba(0, 243, 255, 0.4);
-            padding: 20px 30px;
+            padding: 18px 25px;
             background: rgba(0, 0, 0, 0.5);
             box-shadow: inset 0 0 12px rgba(0, 243, 255, 0.1);
         }
         .controls-hint {
-            font-size: 10px;
+            font-size: 9px;
             color: #8c83a5;
-            margin-top: 18px;
-            line-height: 1.6;
+            margin-top: 15px;
+            line-height: 1.5;
             letter-spacing: 1px;
         }
         .stat-highlight {
@@ -133,7 +133,7 @@
         <div>LVL: <span id="level-val" class="stat-highlight">1</span></div>
     </div>
 
-    <canvas id="gameCanvas" width="480" height="600"></canvas>
+    <canvas id="gameCanvas" width="520" height="520"></canvas>
 
     <div id="menu-screen" class="screen">
         <div class="menu-box">
@@ -143,7 +143,7 @@
             <div class="controls-hint">
                 [MOUSE / ARROWS] MOVE PADDLE<br>
                 [SPACEBAR] FIRE LASER<br>
-                FIXED BALL SPEED • TACTICAL HARDNESS
+                FIXED BALL SPEED • SQUARE MATRIX
             </div>
         </div>
     </div>
@@ -255,7 +255,7 @@
     const basePaddleWidth = 85;
     let paddle = {
         x: canvas.width / 2 - 42,
-        y: canvas.height - 38,
+        y: canvas.height - 35,
         width: basePaddleWidth,
         height: 10,
         dx: 9,
@@ -320,16 +320,16 @@
 
     function loadLevel() {
         bricks = [];
-        let brickRowCount = Math.min(9, 4 + level);
+        let brickRowCount = Math.min(7, 3 + level);
         let brickColumnCount = Math.min(10, 6 + Math.floor(level / 2));
         
-        let brickWidth = Math.max(34, 46 - (level * 2));
-        let brickHeight = 15;
+        let brickWidth = Math.max(34, 44 - (level * 2));
+        let brickHeight = 14;
         let brickPadding = 4;
         
         let totalGridWidth = brickColumnCount * (brickWidth + brickPadding) - brickPadding;
         let brickOffsetLeft = (canvas.width - totalGridWidth) / 2;
-        let brickOffsetTop = 60;
+        let brickOffsetTop = 50;
 
         for (let c = 0; c < brickColumnCount; c++) {
             for (let r = 0; r < brickRowCount; r++) {
@@ -365,7 +365,7 @@
         paddle.hasLasers = false;
         paddle.hasShield = false;
 
-        let fixedSpeed = 6.5;
+        let fixedSpeed = 6.2;
         
         balls = [{
             x: canvas.width / 2,
@@ -536,8 +536,8 @@
                 playSound('hit');
             }
 
-            if (ball.y - ball.radius < 40) {
-                ball.y = 40 + ball.radius;
+            if (ball.y - ball.radius < 35) {
+                ball.y = 35 + ball.radius;
                 ball.dy = Math.abs(ball.dy);
                 playSound('hit');
             }
@@ -638,6 +638,11 @@
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // رسم حدود إضافية داخلية داخل الكانفاس لتوضيح الإطار (Boarders)
+        ctx.strokeStyle = 'rgba(57, 255, 20, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
 
         ctx.save();
         if (shakeTimer > 0) {
